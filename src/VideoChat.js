@@ -39,10 +39,12 @@ const sendToSocket =(message)=>{
     //   return peerConnection.addStream(stream);
     // })
     .then(() => peerConnection.createAnswer())
-    .then((answer) => peerConnection.setLocalDescription(answer))
+    .then((answer)=>console.log("created answer is : ", answer))
+    .then((answer) => 
+      peerConnection.setLocalDescription(answer))
     .then(() => {
       // Send the answer to the remote peer using the signaling server
-      sendToSocket(peerConnection.localDescription);
+      sendToSocket({type: "anwer", sdp: peerConnection.localDescription});
       console.log(peerConnection.localDescription)
     })
     .catch("handleGetUserMediaError");
@@ -80,7 +82,7 @@ async function handleAnswer(message) {
   useEffect(()=>{
   ws.current.onmessage = (event) => {
     const receivedString = event.data;
-    const type = event.data;
+    const type = JSON.stringify(receivedString);
     console.log(type);
     console.log("received string: ",receivedString);
     const message = JSON.parse(receivedString);
@@ -90,7 +92,7 @@ async function handleAnswer(message) {
     
     
   }
-},[])
+},[ws.current])
 
   // ws.current.onmessage = (event) => {
   //   const receivedString = event.data;
