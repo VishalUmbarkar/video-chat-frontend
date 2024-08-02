@@ -46,6 +46,11 @@ const WebRTCComponent = () => {
             'stun:stun4.l.google.com:19302',
           ],
         },
+        {
+          urls: 'turn:49.36.35.163:3478',
+          username: 'example',
+          credential: 'pass'
+        },
       ],
       iceCandidatePoolSize: 10,
     });
