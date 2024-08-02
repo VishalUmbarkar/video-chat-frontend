@@ -1,146 +1,183 @@
-import React, { useEffect, useState, useRef } from 'react';
-import SimplePeer from 'simple-peer';
+import React, { useEffect, useRef } from 'react';
 
-const VideoChat = () => {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [peer, setPeer] = useState(null);
+const WebRTCComponent = () => {
+  // const localVideoRef = useRef(null);
+  // const remoteVideoRef = useRef(null);
+  // const [localStream, setLocalStream] = useState(null);
   const ws = useRef(null);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
 
-  useEffect(() => {
-    ws.current = new WebSocket('ws://video-chat-app-production-24b6.up.railway.app/video-chat');
+  //websocket creation
+  ws.current = new WebSocket('ws://video-chat-app-production-24b6.up.railway.app/video-chat');
 
-    ws.current.onopen = () => {
-      console.log('WebSocket connection opened');
-    };
+  //PeerConnection Creation
+  const peerConnection = new RTCPeerConnection({
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  });
 
-    ws.current.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      console.log('Received WebSocket message:', message);
 
-      if (message.type === 'signal') {
-        console.log('Received signal data:', message.data);
-        if (peer) {
-          peer.signal(message.data);
-        }
-      } else {
-        const newMessage = message.data;
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
-      }
-    };
+//-------------------Utility Functions-----------------------------------
 
-    ws.current.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
+const sendToSocket =(message)=>{
+  console.log("Sending msg to socket:", message);
+  ws.current.send(JSON.stringify({message}));
+}
 
-    ws.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
 
-    return () => {
-      ws.current.close();
-    };
-  }, [peer]);
+ async function handleOffer(message) {
+  console.log(message);
+  const obj = message.message;
+  console.log("obj: ",obj)
+  const rtcSessionDescription = new RTCSessionDescription({
+    type: obj.sdp.type,
+    sdp: obj.sdp.sdp
+  });
+  await peerConnection
+    .setRemoteDescription(rtcSessionDescription)
+    .then(() => navigator.mediaDevices.getUserMedia({audio:"false", video:"true"}))
+    // .then((stream) => {
+    //   document.getElementById("local_video").srcObject = stream;
+    //   return peerConnection.addStream(stream);
+    // })
+    .then(() => peerConnection.createAnswer())
+    .then((answer) => peerConnection.setLocalDescription(answer))
+    .then(() => {
+      // Send the answer to the remote peer using the signaling server
+      sendToSocket(peerConnection.localDescription);
+      console.log(peerConnection.localDescription)
+    })
+    .catch("handleGetUserMediaError");
+}
 
-  useEffect(() => {
-    const setupMedia = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        console.log('Local stream obtained:', stream);
-        localVideoRef.current.srcObject = stream;
+async function handleAnswer(message) {
+  console.log(message);
+  const obj = message.message;
+  console.log("obj: ", obj);
+  const rtcSessionDescription = new RTCSessionDescription({
+    type: obj.sdp.type,
+    sdp: obj.sdp.sdp
+  });
 
-        const isInitiator = window.location.hash === '#init';
-        const newPeer = new SimplePeer({
-          initiator: isInitiator,
-          trickle: true, // Enable trickling for ICE candidates
-          stream: stream,
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' }
-            ]
-          }
-        });
+  await peerConnection
+    .setRemoteDescription(rtcSessionDescription)
+    .then(() => {
+      console.log("Remote description set successfully with answer: ", rtcSessionDescription);
+    })
+    .catch((error) => {
+      console.error('Error setting remote description with answer:', error);
+    });
+} 
 
-        newPeer.on('signal', (data) => {
-          console.log("Generated signal data: ", data);
-          ws.current.send(JSON.stringify({ type: 'signal', data }));
-        });
+//-------------------Web Socket Events---------------------------------------
 
-        newPeer.on('stream', (remoteStream) => {
-          console.log('Received remote stream:', remoteStream);
-          remoteVideoRef.current.srcObject = remoteStream;
-        });
+  ws.current.onopen = ()=>{
+    console.log("Websocket online");
+  }
 
-        newPeer.on('error', (err) => {
-          console.error('Peer error:', err);
-        });
+  ws.current.onclose = ()=>{
+    console.log("Websocket offline");
+  }
 
-        newPeer.on('connect', () => {
-          console.log('Peer connected');
-        });
+  useEffect(()=>{
+  ws.current.onmessage = (event) => {
+    const receivedString = event.data;
+    const type = event.data;
+    console.log(type);
+    console.log("received string: ",receivedString);
+    const message = JSON.parse(receivedString);
+    console.log(message.type);
+    handleOffer(message);
+    
+    
+    
+  }
+},[])
 
-        newPeer.on('iceStateChange', (state) => {
-          console.log('ICE state change:', state);
-        });
+  // ws.current.onmessage = (event) => {
+  //   const receivedString = event.data;
+  //   console.log("received string: ",receivedString);
+  //   const message = JSON.parse(receivedString);
+  //   if (message.type === "answer") {
+  //     handleAnswer(message);
+  //   }
+    
+  // }
 
-        newPeer.on('iceConnectionStateChange', (state) => {
-          console.log('ICE connection state change:', state);
-        });
+//----------------------------------------------------------------------------
 
-        newPeer.on('iceConnectionStateChange', () => {
-          console.log('ICE connection state:', newPeer.iceConnectionState);
-        });
+//---------------------Peer Connection Events---------------------------------
 
-        newPeer.on('iceGatheringStateChange', () => {
-          console.log('ICE gathering state:', newPeer.iceGatheringState);
-        });
+peerConnection.onicecandidate = (ev) => {
+  if (ev.candidate !== null) {
+    sendToSocket({
+      type: "new-ice-candidate",
+      candidate: ev.candidate,
+    });
+  }
+};
 
-        setPeer(newPeer);
-      } catch (error) {
-        console.error('Error accessing media devices:', error);
-      }
-    };
 
-    setupMedia();
-  }, []);
+peerConnection.addEventListener("icegatheringstatechange", (ev) => {
+  switch (peerConnection.iceGatheringState) {
+    case "new":
+      /* gathering is either just starting or has been reset */
+      console.log("new")
+      break;
+    case "gathering":
+      /* gathering has begun or is ongoing */
+      console.log("gathering")
+      break;
+    case "complete":
+      /* gathering has ended */
+      console.log("completed")
+      break;
+     default:
+      console.log("nothing")
+  }
+});
 
-  const sendMessage = () => {
-    if (ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify({ type: 'message', data: input }));
-      setInput('');
-    }
-  };
+
+peerConnection.onicecandidate = (ev) => {
+  if(ev.candidate){
+    console.log("candidate is null");
+  }
+  if (ev.candidate !== null) {
+    console.log("Sending new ice candidate to socket server: ", ev.candidate);
+    sendToSocket({
+      type: "new-ice-candidate",
+      candidate: ev.candidate,
+    });
+  }
+};
+
+
+
+const makeCall = ()=>{
+  console.log("Call Initiated");
+  try {
+    peerConnection.createOffer()
+    .then((offer)=> peerConnection.setLocalDescription(offer))
+    .then(()=> {
+      sendToSocket({type: "offer", sdp: peerConnection.localDescription,});
+      // console.log("localDescription: ", localDescription);
+    })
+    // console.log("Offer created: ", offer);
+  } catch (error) {
+    console.warn("Error while creating local offer : ", error);
+  }
+  
+}
+
 
   return (
-    
     <div>
-      <h1>Video Chat</h1>
-      {/* {newPeer && ( */}
-      <div className="video-container">
-        <video ref={localVideoRef} autoPlay muted />
-        <video ref={remoteVideoRef} autoPlay muted />
-      </div>
-      {/* )} */}
-      <div className="messages">
-        {messages.map((msg, index) => (
-          <div key={index}>{msg}</div>
-        ))}
-      </div>
-
-      <input
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Type a message"
-      />
-      <button onClick={sendMessage}>Send</button>
+      {/* <video ref={localVideoRef} autoPlay muted></video> */}
+      {/* <video ref={remoteVideoRef} autoPlay></video> */}
+      <button onClick={makeCall}>Start Call</button>
     </div>
-    
   );
 };
 
-export default VideoChat;
+export default WebRTCComponent;
+
+
+
