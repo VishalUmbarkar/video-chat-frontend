@@ -27,6 +27,8 @@ const sendToSocket =(message)=>{
   console.log(message);
   const obj = message.message;
   console.log("obj: ",obj)
+  console.log("message type: ", obj.type);
+  if(obj.type==="offer"){
   const rtcSessionDescription = new RTCSessionDescription({
     type: obj.sdp.type,
     sdp: obj.sdp.sdp
@@ -48,6 +50,22 @@ const sendToSocket =(message)=>{
       console.log(peerConnection.localDescription)
     })
     .catch("handleGetUserMediaError");
+  }
+  else if(obj.type==="anwer"){
+    const rtcSessionDescription = new RTCSessionDescription({
+      type: obj.sdp.type,
+      sdp: obj.sdp.sdp
+    });
+  
+    await peerConnection
+      .setRemoteDescription(rtcSessionDescription)
+      .then(() => {
+        console.log("Remote description set successfully with answer: ", rtcSessionDescription);
+      })
+      .catch((error) => {
+        console.error('Error setting remote description with answer:', error);
+      });
+  }
 }
 
 async function handleAnswer(message) {
