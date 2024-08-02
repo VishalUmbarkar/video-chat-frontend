@@ -3,6 +3,8 @@ import React, { useEffect, useRef } from 'react';
 const WebRTCComponent = () => {
   const ws = useRef(null);
   const peerConnection = useRef(null);
+  const queuedCandidates = useRef([]);
+  const localStream = useRef(null);
 
   useEffect(() => {
     // WebSocket creation
@@ -39,7 +41,7 @@ const WebRTCComponent = () => {
         console.log("Sending new ice candidate to socket server: ", ev.candidate);
         sendToSocket({
           type: "new-ice-candidate",
-          candidate: ev.candidate,
+          candidate: ev.candidate
         });
       }
     };
@@ -80,15 +82,12 @@ const WebRTCComponent = () => {
     };
   }, []);
 
-
   //----------------------------functions---------------------------------------------------
 
   const sendToSocket = (message) => {
     console.log("Sending msg to socket:", message);
     ws.current.send(JSON.stringify(message));
   };
-
-//----------handleOffer starts
 
   const handleOffer = async (message) => {
     console.log("Handling offer:", message);
@@ -106,24 +105,50 @@ const WebRTCComponent = () => {
       type: "answer",
       sdp: peerConnection.current.localDescription
     });
-  };
 
- //-----------handleAnswer starts
+    // Process queued ICE candidates
+    await processQueuedCandidates();
+  };
 
   const handleAnswer = async (message) => {
     console.log("Handling answer:", message);
 
     const rtcSessionDescription = new RTCSessionDescription(message.sdp);
     await peerConnection.current.setRemoteDescription(rtcSessionDescription);
+
+    // Process queued ICE candidates
+    await processQueuedCandidates();
   };
 
   const handleNewICECandidateMsg = async (message) => {
-    console.log("iceCandidate : ", message.candidate);
+    console.log("Received ICE candidate:", message.candidate);
+
     const candidate = new RTCIceCandidate(message.candidate);
-    await peerConnection.current.addIceCandidate(candidate);
+    if (peerConnection.current.remoteDescription) {
+      try {
+        await peerConnection.current.addIceCandidate(candidate);
+        console.log("Added ICE candidate successfully.");
+      } catch (error) {
+        console.error("Error adding received ICE candidate", error);
+      }
+    } else {
+      console.log("Remote description not set yet, queuing ICE candidate.");
+      queuedCandidates.current.push(candidate);
+    }
   };
 
-  //-----------makeCall starts
+  const processQueuedCandidates = async () => {
+    console.log("Processing queued ICE candidates.");
+    for (const candidate of queuedCandidates.current) {
+      try {
+        await peerConnection.current.addIceCandidate(candidate);
+        console.log("Added queued ICE candidate successfully.");
+      } catch (error) {
+        console.error("Error adding queued ICE candidate", error);
+      }
+    }
+    queuedCandidates.current = [];
+  };
 
   const makeCall = async () => {
     console.log("Call Initiated");
