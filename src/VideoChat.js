@@ -5,6 +5,9 @@ const WebRTCComponent = () => {
   const peerConnection = useRef(null);
   const queuedCandidates = useRef([]);
   const localStream = useRef(null);
+  const remoteStream = useRef(new MediaStream());
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
   useEffect(() => {
     // WebSocket creation
@@ -77,6 +80,11 @@ const WebRTCComponent = () => {
         });
     };
 
+    peerConnection.current.ontrack = (event) => {
+      event.streams[0].getTracks().forEach(track => remoteStream.current.addTrack(track));
+      remoteVideoRef.current.srcObject = remoteStream.current;
+    };
+
     return () => {
       ws.current.close();
     };
@@ -96,6 +104,9 @@ const WebRTCComponent = () => {
     await peerConnection.current.setRemoteDescription(rtcSessionDescription);
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    localStream.current = stream;
+    localVideoRef.current.srcObject = stream;
+
     stream.getTracks().forEach(track => peerConnection.current.addTrack(track, stream));
 
     const answer = await peerConnection.current.createAnswer();
@@ -154,6 +165,12 @@ const WebRTCComponent = () => {
     console.log("Call Initiated");
 
     try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+      localStream.current = stream;
+      localVideoRef.current.srcObject = stream;
+
+      stream.getTracks().forEach(track => peerConnection.current.addTrack(track, stream));
+
       const offer = await peerConnection.current.createOffer();
       await peerConnection.current.setLocalDescription(offer);
 
@@ -168,6 +185,8 @@ const WebRTCComponent = () => {
 
   return (
     <div>
+      <video ref={localVideoRef} autoPlay muted style={{ width: '300px', height: '300px' }} />
+      <video ref={remoteVideoRef} autoPlay style={{ width: '300px', height: '300px' }} />
       <button onClick={makeCall}>Start Call</button>
     </div>
   );
