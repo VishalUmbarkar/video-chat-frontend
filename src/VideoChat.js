@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-//hello
 
 const WebRTCComponent = () => {
   // const localVideoRef = useRef(null);
@@ -86,7 +85,7 @@ async function handleAnswer(message) {
     console.log("received string: ",receivedString);
     const message = JSON.parse(receivedString);
     console.log(message.type);
-      handleOffer(message);
+    handleOffer(message);
     
     
     
