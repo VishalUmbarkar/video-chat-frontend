@@ -36,7 +36,18 @@ const WebRTCComponent = () => {
 
     // PeerConnection Creation
     peerConnection.current = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      // iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: [
+        {
+          urls: [
+            'stun:stun1.l.google.com:19302',
+            'stun:stun2.l.google.com:19302',
+            'stun:stun3.l.google.com:19302',
+            'stun:stun4.l.google.com:19302',
+          ],
+        },
+      ],
+      iceCandidatePoolSize: 10,
     });
 
     peerConnection.current.onicecandidate = (ev) => {
@@ -137,6 +148,7 @@ const WebRTCComponent = () => {
     const candidate = new RTCIceCandidate(message.candidate);
     if (peerConnection.current.remoteDescription) {
       try {
+        setTimeout(1000);
         await peerConnection.current.addIceCandidate(candidate);
         console.log("Added ICE candidate successfully.");
       } catch (error) {
@@ -152,6 +164,7 @@ const WebRTCComponent = () => {
     console.log("Processing queued ICE candidates.");
     for (const candidate of queuedCandidates.current) {
       try {
+        console.log("adding ice candidate to queue", candidate)
         await peerConnection.current.addIceCandidate(candidate);
         console.log("Added queued ICE candidate successfully.");
       } catch (error) {
