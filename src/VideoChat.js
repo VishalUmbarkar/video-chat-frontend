@@ -11,7 +11,7 @@ const WebRTCComponent = () => {
 
   useEffect(() => {
     // WebSocket creation
-    ws.current = new WebSocket('ws://video-chat-app-production-24b6.up.railway.app/video-chat');
+    ws.current = new WebSocket('wss://video-chat-app-production-24b6.up.railway.app/video-chat');
 
     ws.current.onopen = () => {
       console.log("WebSocket online");
